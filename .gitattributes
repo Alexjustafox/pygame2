@@ -1,0 +1,198 @@
+import pygame
+import sys
+
+pygame.init()
+screen = pygame.display.set_mode((1143, 677))
+pygame.display.set_caption("PH levels or something")
+clock = pygame.time.Clock()
+BG_COLOR = (0, 255, 255)
+
+def load_image(path, size=(50, 150)):
+    try:
+        return pygame.transform.scale(pygame.image.load(path), size)
+    except:
+        print(f"Missing: {path}")
+        sys.exit()
+
+# Load images
+tube1 = load_image("water1.png")
+tube2 = load_image("water2.png")
+tube3 = load_image("water3.png")
+tube0 = load_image("pixil-frame-0 (9).png")
+acid1 = load_image("pixil-frame-0 (12).png", (75, 75))
+acid2 = load_image("pixil-frame-0 (17).png")
+acid3 = load_image("bat.png")
+base1 = load_image("pixil-frame-0 (15).png", (75, 100))
+base2 = load_image("pixil-frame-0 (11).png", (100, 150))
+base3 = load_image("pixil-frame-0 (16).png", (100, 150))
+water = load_image("bottle.png", (50, 150))
+box = load_image("box.png", (175, 175))
+gbox = load_image("boxg.png", (175, 175))
+rbox = load_image("boxr.png", (175, 175))
+
+results = [load_image(f"pixil-frame-0 ({i}).png") for i in range(18, 39)]
+
+originals = [
+    {"name": "tube1", "img": tube1, "rect": pygame.Rect(20, 520, 50, 150)},
+    {"name": "tube2", "img": tube2, "rect": pygame.Rect(90, 520, 50, 150)},
+    {"name": "tube3", "img": tube3, "rect": pygame.Rect(160, 520, 50, 150)},
+    {"name": "tube0", "img": tube0, "rect": pygame.Rect(230, 520, 50, 150)},
+    {"name": "acid1", "img": acid1, "rect": pygame.Rect(300, 590, 75, 75)},
+    {"name": "acid2", "img": acid2, "rect": pygame.Rect(390, 520, 50, 150)},
+    {"name": "acid3", "img": acid3, "rect": pygame.Rect(480, 520, 100, 150)},
+    {"name": "base1", "img": base1, "rect": pygame.Rect(550, 570, 100, 150)},
+    {"name": "base2", "img": base2, "rect": pygame.Rect(650, 520, 100, 150)},
+    {"name": "base3", "img": base3, "rect": pygame.Rect(770, 520, 100, 150)},
+    {"name": "water", "img": water, "rect": pygame.Rect(890, 520, 50, 150)},
+]
+
+stillobjects = [
+    {"name": "Sacid1", "img": acid1, "rect": pygame.Rect(50, 50, 75, 75)},
+    {"name": "Sacid2", "img": acid2, "rect": pygame.Rect(220, 10, 50, 150)},
+    {"name": "Sacid3", "img": acid3, "rect": pygame.Rect(385, 15, 100, 150)},
+    {"name": "Sbase1", "img": base1, "rect": pygame.Rect(530, 40, 100, 150)},
+    {"name": "Sbase2", "img": base2, "rect": pygame.Rect(680, 10, 100, 150)},
+    {"name": "Sbase3", "img": base3, "rect": pygame.Rect(840, 10, 100, 150)},
+    {"name": "Swater", "img": water, "rect": pygame.Rect(1020, 15, 50, 150)},
+]
+
+boxes = [
+    {"img": box, "rect": pygame.Rect(x, 0, 150, 150), "correct_imgs": []}
+    for x in range(0, 1050, 160)
+]
+
+instructions_icon = load_image("instructions_icon.png", (100, 100))
+instructions_big = load_image("instructions_big.png", (1143, 677))
+instructions_rect = pygame.Rect(1020, 560, 100, 100)
+showing_instructions = False
+
+# Assign expected results for each box
+box_matches = [
+    (3, 4, 5),
+    (6, 7, 8),
+    (18, 19, 20),
+    (9, 10, 11),
+    (15, 16, 17),
+    (12, 13, 14),
+    (0, 1, 2),
+]
+for i, match in enumerate(box_matches):
+    boxes[i]["correct_imgs"] = [results[j] for j in match]
+
+reaction_map = {
+    ("tube1", "acid1"): results[3],
+    ("tube1", "acid2"): results[6],
+    ("tube1", "acid3"): results[18],
+    ("tube1", "base1"): results[9],
+    ("tube1", "base2"): results[15],
+    ("tube1", "base3"): results[12],
+    ("tube1", "water"): results[0],
+    ("tube2", "acid1"): results[4],
+    ("tube2", "acid2"): results[7],
+    ("tube2", "acid3"): results[19],
+    ("tube2", "base1"): results[10],
+    ("tube2", "base2"): results[16],
+    ("tube2", "base3"): results[13],
+    ("tube2", "water"): results[1],
+    ("tube3", "acid1"): results[5],
+    ("tube3", "acid2"): results[8],
+    ("tube3", "acid3"): results[20],
+    ("tube3", "base1"): results[11],
+    ("tube3", "base2"): results[17],
+    ("tube3", "base3"): results[14],
+    ("tube3", "water"): results[2],
+}
+
+clones = []
+dragging = None
+offset_x = 0
+offset_y = 0
+
+def check_reactions():
+    for vial in clones:
+        if not vial["name"].startswith("tube") or vial["name"] == "tube0" or vial.get("reacted"):
+            continue
+        for other in clones:
+            if other["name"] in ("acid1", "acid2", "acid3", "base1", "base2", "base3", "water"):
+                if vial["rect"].colliderect(other["rect"]):
+                    result = reaction_map.get((vial["name"], other["name"]))
+                    if result:
+                        vial["img"] = result
+                        vial["reacted"] = True
+                        break
+
+# Main loop
+running = True
+while running:
+    screen.fill(BG_COLOR)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            check_reactions()
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            pos = event.pos
+            if instructions_rect.collidepoint(pos) and not showing_instructions:
+                showing_instructions = True
+            else:
+                for item in originals:
+                    if item["rect"].collidepoint(pos):
+                        new_rect = item["img"].get_rect(topleft=(item["rect"].x + 10, item["rect"].y - 200))
+                        clones.append({"name": item["name"], "img": item["img"], "rect": new_rect})
+                        break
+                for i in range(len(clones) - 1, -1, -1):
+                    if clones[i]["rect"].collidepoint(pos):
+                        dragging = i
+                        offset_x = clones[i]["rect"].x - pos[0]
+                        offset_y = clones[i]["rect"].y - pos[1]
+                        break
+
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if showing_instructions:
+                showing_instructions = False
+            else:
+                dragging = None
+
+        elif event.type == pygame.MOUSEMOTION and dragging is not None:
+            pos = event.pos
+            clones[dragging]["rect"].x = pos[0] + offset_x
+            clones[dragging]["rect"].y = pos[1] + offset_y
+
+    # Collision check with boxes
+    for box in boxes:
+        box["img"] = box["original"] if "original" in box else box["img"]
+        box_collide = False
+        for clone in clones:
+            if box["rect"].colliderect(clone["rect"]):
+                box_collide = True
+                if clone["img"] in box["correct_imgs"]:
+                    box["img"] = gbox
+                else:
+                    box["img"] = hbox
+        if not box_collide:
+            box["img"] = box.get("original", box["img"])
+            box["original"] = box["img"]
+
+    # Drawing
+    for item in originals:
+        screen.blit(item["img"], item["rect"])
+    for clone in clones:
+        screen.blit(clone["img"], clone["rect"])
+    for box in boxes:
+        screen.blit(box["img"], box["rect"])
+    for still in stillobjects:
+        screen.blit(still["img"], still["rect"])
+    screen.blit(instructions_icon, instructions_rect)
+
+    if showing_instructions:
+        screen.blit(instructions_big, (0, 0))
+
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
+sys.exit()
+
